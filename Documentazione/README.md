@@ -55,8 +55,25 @@ python manage.py createsuperuser
 
 Ti verranno chiesti username, email (facoltativo) e password. Poi accedi a `/admin/` con queste credenziali.
 
-### Importa un file XLSX con solo i titoli (autocompilazione con OMDb)
-Se hai un file Excel che contiene solo i titoli, puoi far riempire automaticamente anno, regista, genere, trama, poster e rating con i dati di OMDb.
+### Importa un file XLSX con solo i titoli
+Se hai un file Excel che contiene solo i titoli, puoi popolare il database in due modalità:
+
+- **Senza completamento dati (solo titoli):** non serve la chiave OMDb, gli altri campi restano vuoti.
+- **Con autocompilazione OMDb:** richiede la chiave API per ottenere anno, regista, generi, trama, poster e rating.
+
+1. Prepara il file XLSX: la prima riga è l'intestazione, serve almeno una colonna `Titolo`/`Title`/`Film` con i nomi dei film (le altre colonne possono mancare).
+2. Esegui l'import (da dentro la cartella che contiene `manage.py`):
+   ```bash
+   # Solo titoli, altri campi vuoti
+   python manage.py import_films_xlsx /percorso/del/file.xlsx --titles-only
+
+   # Autocompilazione OMDb (richiede OMDB_API_KEY nel .env)
+   python manage.py import_films_xlsx /percorso/del/file.xlsx
+   # Aggiungi --watched se vuoi segnare tutti come "visti"
+   # python manage.py import_films_xlsx /percorso/del/file.xlsx --watched
+   ```
+
+Se usi l'autocompilazione OMDb:
 
 1. Ottieni una chiave API gratuita da [OMDb](http://www.omdbapi.com/apikey.aspx). Ho già inserito la variabile `OMDB_API_KEY` nel tuo `.env` con il segnaposto `INSERISCI_LA_TUA_CHIAVE`: sostituiscilo con la tua chiave, per esempio:
    ```bash
@@ -64,20 +81,10 @@ Se hai un file Excel che contiene solo i titoli, puoi far riempire automaticamen
    # in alternativa aggiungi/modifica manualmente la riga
    # OMDB_API_KEY=la_tua_chiave
    ```
-2. Prepara il file XLSX: la prima riga è l'intestazione, serve almeno una colonna `Titolo`/`Title`/`Film` con i nomi dei film (le altre colonne possono mancare).
-3. Lancia il comando di import (da dentro la cartella del progetto che contiene `manage.py`):
+2. Il comando verifica subito la chiave OMDb prima di leggere il file: se la chiave è errata/inattiva riceverai un errore immediato (401 Unauthorized) con le istruzioni per sostituirla. Puoi testarla anche manualmente con:
    ```bash
-   python manage.py import_films_xlsx /percorso/del/file.xlsx
-   # Aggiungi --watched se vuoi segnare tutti come "visti"
-   # python manage.py import_films_xlsx /percorso/del/file.xlsx --watched
+   curl "https://www.omdbapi.com/?t=Matrix&apikey=$OMDB_API_KEY"
    ```
-
-Il comando, per ogni titolo trovato su OMDb, inserisce/aggiorna il film impostando anno, primo regista, generi, rating IMDB (con una cifra decimale), poster e trama nelle note. Se un film è già presente con stesso titolo+anno+regista, vengono aggiornati solo i generi.
-
-Il comando verifica subito la chiave OMDb prima di leggere il file: se la chiave è errata/inattiva riceverai un errore immediato (401 Unauthorized) con le istruzioni per sostituirla. Puoi testarla anche manualmente con:
-```bash
-curl "https://www.omdbapi.com/?t=Matrix&apikey=$OMDB_API_KEY"
-```
 
 ### Dove si trova `requirements.txt`
 - Percorso completo nel repository: `/workspace/Documentazione/Documentazione/requirements.txt`.

@@ -95,19 +95,26 @@ class Command(BaseCommand):
         parser.add_argument(
             '--watched', action='store_true', help='Imposta flag "visto" a True per tutti i film importati'
         )
+        parser.add_argument(
+            '--titles-only',
+            action='store_true',
+            help='Importa solo i titoli senza completamento OMDb (altri campi vuoti)',
+        )
 
     def handle(self, *args, **options):
         file_path = Path(options['file_path'])
         watched_default = options['watched']
+        titles_only = options['titles_only']
         api_key = getattr(settings, 'OMDB_API_KEY', None)
 
-        if not api_key:
-            raise CommandError('Configura OMDB_API_KEY nel file .env prima di eseguire questo comando.')
+        if not titles_only:
+            if not api_key:
+                raise CommandError('Configura OMDB_API_KEY nel file .env prima di eseguire questo comando.')
 
-        if api_key.upper() == 'INSERISCI_LA_TUA_CHIAVE':
-            raise CommandError('Sostituisci INSERISCI_LA_TUA_CHIAVE con la tua API key OMDb reale in .env.')
+            if api_key.upper() == 'INSERISCI_LA_TUA_CHIAVE':
+                raise CommandError('Sostituisci INSERISCI_LA_TUA_CHIAVE con la tua API key OMDb reale in .env.')
 
-        validate_api_key(api_key)
+            validate_api_key(api_key)
 
         if not file_path.exists():
             raise CommandError(f"File non trovato: {file_path}")
@@ -126,54 +133,64 @@ class Command(BaseCommand):
                 continue
 
             title = str(raw_title).strip()
-            try:
-                metadata = fetch_metadata(title, api_key)
-            except HTTPError as exc:
-                if exc.response is not None and exc.response.status_code == 401:
-                    raise CommandError(
-                        'OMDb ha risposto 401 Unauthorized: verifica che OMDB_API_KEY in .env sia corretta '
-                        'e attiva. Puoi testarla con `curl "https://www.omdbapi.com/?t=Matrix&apikey=$OMDB_API_KEY"`.'
-                    ) from exc
-                skipped.append((idx, f"Errore API HTTP: {exc}"))
-                continue
-            except Exception as exc:  # broad for API/HTTP errors
-                skipped.append((idx, f"Errore API: {exc}"))
-                continue
-
-            year_raw = metadata.get('year')
-            try:
-                year = int(str(year_raw)[:4])
-            except (TypeError, ValueError):
-                skipped.append((idx, 'Anno non valido'))
-                continue
-
-            directors = normalize_list(metadata.get('director'))
-            director_name = directors[0] if directors else 'Sconosciuto'
-            director, _ = Director.objects.get_or_create(name=director_name)
-
-            film, created = Film.objects.get_or_create(
-                title=title,
-                year=year,
-                director=director,
-                defaults={
-                    'watched': watched_default,
-                    'rating': parse_rating(metadata.get('rating')),
-                    'poster_url': metadata.get('poster') if metadata.get('poster') not in {None, 'N/A'} else '',
-                    'notes': metadata.get('plot') if metadata.get('plot') not in {None, 'N/A'} else '',
-                },
-            )
-
-            genre_names = normalize_list(metadata.get('genres'))
-            if genre_names:
-                genres = [Genre.objects.get_or_create(name=name)[0] for name in genre_names]
-                film.genres.set(genres)
-            else:
+            if titles_only:
+                film, created = Film.objects.get_or_create(
+                    title=title,
+                    defaults={'watched': watched_default},
+                )
                 film.genres.clear()
+            else:
+                try:
+                    metadata = fetch_metadata(title, api_key)
+                except HTTPError as exc:
+                    if exc.response is not None and exc.response.status_code == 401:
+                        raise CommandError(
+                            'OMDb ha risposto 401 Unauthorized: verifica che OMDB_API_KEY in .env sia corretta '
+                            'e attiva. Puoi testarla con `curl "https://www.omdbapi.com/?t=Matrix&apikey=$OMDB_API_KEY"`.'
+                        ) from exc
+                    skipped.append((idx, f"Errore API HTTP: {exc}"))
+                    continue
+                except Exception as exc:  # broad for API/HTTP errors
+                    skipped.append((idx, f"Errore API: {exc}"))
+                    continue
+
+                year_raw = metadata.get('year')
+                try:
+                    year = int(str(year_raw)[:4])
+                except (TypeError, ValueError):
+                    skipped.append((idx, 'Anno non valido'))
+                    continue
+
+                directors = normalize_list(metadata.get('director'))
+                director_name = directors[0] if directors else 'Sconosciuto'
+                director, _ = Director.objects.get_or_create(name=director_name)
+
+                film, created = Film.objects.get_or_create(
+                    title=title,
+                    year=year,
+                    director=director,
+                    defaults={
+                        'watched': watched_default,
+                        'rating': parse_rating(metadata.get('rating')),
+                        'poster_url': metadata.get('poster') if metadata.get('poster') not in {None, 'N/A'} else '',
+                        'notes': metadata.get('plot') if metadata.get('plot') not in {None, 'N/A'} else '',
+                    },
+                )
+
+                genre_names = normalize_list(metadata.get('genres'))
+                if genre_names:
+                    genres = [Genre.objects.get_or_create(name=name)[0] for name in genre_names]
+                    film.genres.set(genres)
+                else:
+                    film.genres.clear()
 
             if created:
                 imported += 1
             else:
-                self.stdout.write(self.style.NOTICE(f"Film già presente, aggiornati solo i generi: {title}"))
+                message = "Film già presente"
+                if not titles_only:
+                    message += ", aggiornati solo i generi"
+                self.stdout.write(self.style.NOTICE(f"{message}: {title}"))
 
         summary = f"Import completato: {imported} inseriti, {len(skipped)} saltati."
         self.stdout.write(self.style.SUCCESS(summary))

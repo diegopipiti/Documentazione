@@ -28,7 +28,11 @@
                 <header style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
                     <div>
                         <h2 style="margin:0;">{{ film.title }}</h2>
-                        <small style="color:#667;">{{ film.year }} • {{ film.director.name }}</small>
+                        <small style="color:#667;">
+                            {% if film.year %}{{ film.year }}{% endif %}
+                            {% if film.year and film.director %} • {% endif %}
+                            {% if film.director %}{{ film.director.name }}{% endif %}
+                        </small>
                     </div>
                     {% if film.watched %}
                         <span class="badge" style="background:#def5e5;color:#0e7e4a;">Visto</span>

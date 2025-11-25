@@ -9,6 +9,7 @@ env = environ.Env(
     DEBUG=(bool, True),
     SECRET_KEY=(str, 'change-me'),
     ALLOWED_HOSTS=(list, ['127.0.0.1', 'localhost']),
+    OMDB_API_KEY=(str, None),
 )
 
 # Carica variabili da .env se presente
@@ -19,6 +20,7 @@ if ENV_FILE.exists():
 SECRET_KEY = env('SECRET_KEY')
 DEBUG = env('DEBUG')
 ALLOWED_HOSTS = env('ALLOWED_HOSTS')
+OMDB_API_KEY = env('OMDB_API_KEY')
 
 INSTALLED_APPS = [
     'django.contrib.admin',

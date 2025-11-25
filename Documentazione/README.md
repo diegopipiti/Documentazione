@@ -42,7 +42,37 @@ Assicurati che il numero sia **3.11** o superiore.
    python manage.py runserver
    ```
 
+   > Se vedi l'errore `django.db.utils.OperationalError: no such table: films_film`, significa che le migrazioni non sono state applicate: ripeti il comando `python manage.py migrate` dopo aver installato le dipendenze.
+
 Visita `http://127.0.0.1:8000/` per vedere la lista film. L'admin Django è disponibile su `/admin/`.
+
+### Crea un utente amministratore
+Per accedere all'admin ed inserire rapidamente film, genera un superuser dopo aver applicato le migrazioni:
+
+```bash
+python manage.py createsuperuser
+```
+
+Ti verranno chiesti username, email (facoltativo) e password. Poi accedi a `/admin/` con queste credenziali.
+
+### Importa un file XLSX con solo i titoli (autocompilazione con OMDb)
+Se hai un file Excel che contiene solo i titoli, puoi far riempire automaticamente anno, regista, genere, trama, poster e rating con i dati di OMDb.
+
+1. Ottieni una chiave API gratuita da [OMDb](http://www.omdbapi.com/apikey.aspx). Ho già inserito la variabile `OMDB_API_KEY` nel tuo `.env` con il segnaposto `INSERISCI_LA_TUA_CHIAVE`: sostituiscilo con la tua chiave, per esempio:
+   ```bash
+   sed -i "s/INSERISCI_LA_TUA_CHIAVE/la_tua_chiave/" .env
+   # in alternativa aggiungi/modifica manualmente la riga
+   # OMDB_API_KEY=la_tua_chiave
+   ```
+2. Prepara il file XLSX: la prima riga è l'intestazione, serve almeno una colonna `Titolo`/`Title`/`Film` con i nomi dei film (le altre colonne possono mancare).
+3. Lancia il comando di import (da dentro la cartella del progetto che contiene `manage.py`):
+   ```bash
+   python manage.py import_films_xlsx /percorso/del/file.xlsx
+   # Aggiungi --watched se vuoi segnare tutti come "visti"
+   # python manage.py import_films_xlsx /percorso/del/file.xlsx --watched
+   ```
+
+Il comando, per ogni titolo trovato su OMDb, inserisce/aggiorna il film impostando anno, primo regista, generi, rating IMDB (con una cifra decimale), poster e trama nelle note. Se un film è già presente con stesso titolo+anno+regista, vengono aggiornati solo i generi.
 
 ### Dove si trova `requirements.txt`
 - Percorso completo nel repository: `/workspace/Documentazione/Documentazione/requirements.txt`.
